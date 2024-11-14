@@ -1,0 +1,437 @@
+//MAIN
+package Warehouse;
+
+import java.util.Scanner;
+import java.util.List;
+
+public class Main {
+    private static WarehouseInventory warehouseInventory = new WarehouseInventory();
+    private static Scanner scanner = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        while (true) {
+            System.out.println("\n--- Warehouse Management System ---");
+            System.out.println("1. Add Product");
+            System.out.println("2. View Products");
+            System.out.println("3. Add Supplier");
+            System.out.println("4. View Suppliers");
+            System.out.println("5. Update Stock");
+            System.out.println("6. Exit");
+            System.out.print("Choose an option: ");
+
+            int choice = scanner.nextInt();
+            scanner.nextLine();  // Consume newline
+
+            switch (choice) {
+                case 1 -> addProduct();
+                case 2 -> viewProducts();
+                case 3 -> addSupplier();
+                case 4 -> viewSuppliers();
+                case 5 -> updateStock();
+                case 6 -> {
+                    System.out.println("Exiting the system...");
+                    return;
+                }
+                default -> System.out.println("Invalid choice. Please try again.");
+            }
+        }
+    }
+
+    private static void addProduct() {
+        System.out.print("Enter Product ID: ");
+        int productId = scanner.nextInt();
+        scanner.nextLine();  // Consume newline
+
+        System.out.print("Enter Product Name: ");
+        String productName = scanner.nextLine();
+
+        System.out.print("Enter Product Type (Perishable/NonPerishable): ");
+        String productType = scanner.nextLine();
+
+        System.out.print("Enter Quantity: ");
+        int quantity = scanner.nextInt();
+
+        System.out.print("Enter Price: ");
+        double price = scanner.nextDouble();
+        scanner.nextLine();  // Consume newline
+
+        System.out.print("Enter Storage Requirements (if any): ");
+        String storageRequirements = scanner.nextLine();
+
+        Product product;
+        if (productType.equalsIgnoreCase("Perishable")) {
+            product = new PerishableProduct(productId, productName, quantity, price, storageRequirements);
+        } else {
+            product = new NonPerishableProduct(productId, productName, quantity, price);
+        }
+
+        warehouseInventory.addProduct(product);
+        System.out.println("Product added successfully.");
+    }
+
+    private static void viewProducts() {
+        List<Product> products = warehouseInventory.viewProducts();
+        System.out.println("\n--- Product Inventory ---");
+        for (Product product : products) {
+            product.displayProductInfo();
+            System.out.println("----------------------------------");
+        }
+    }
+
+    private static void addSupplier() {
+        System.out.print("Enter Supplier ID: ");
+        int supplierId = scanner.nextInt();
+        scanner.nextLine();  // Consume newline
+
+        System.out.print("Enter Supplier Name: ");
+        String supplierName = scanner.nextLine();
+
+        System.out.print("Enter Contact Name: ");
+        String contactName = scanner.nextLine();
+
+        System.out.print("Enter Contact Number: ");
+        String contactNumber = scanner.nextLine();
+
+        System.out.print("Enter Address: ");
+        String address = scanner.nextLine();
+
+        Supplier supplier = new Supplier(supplierId, supplierName, contactName, contactNumber, address);
+        warehouseInventory.addSupplier(supplier);
+        System.out.println("Supplier added successfully.");
+    }
+
+    private static void viewSuppliers() {
+        List<Supplier> suppliers = warehouseInventory.viewSuppliers();
+        System.out.println("\n--- Suppliers ---");
+        for (Supplier supplier : suppliers) {
+            System.out.println("Supplier ID: " + supplier.getSupplierId());
+            System.out.println("Supplier Name: " + supplier.getSupplierName());
+            System.out.println("Contact Name: " + supplier.getContactName());
+            System.out.println("Contact Number: " + supplier.getContactNumber());
+            System.out.println("Address: " + supplier.getAddress());
+            System.out.println("----------------------------------");
+        }
+    }
+
+    private static void updateStock() {
+        System.out.print("Enter Product ID: ");
+        int productId = scanner.nextInt();
+
+        System.out.print("Enter New Quantity: ");
+        int quantity = scanner.nextInt();
+
+        warehouseInventory.updateStock(productId, quantity);
+        System.out.println("Stock updated successfully.");
+    }
+}
+
+//WAREHOUSE INVENTORY
+
+package Warehouse;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class WarehouseInventory implements InventoryManagement {
+    @Override
+    public void addProduct(Product product) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            String query = "INSERT INTO Products (product_id, product_name, product_type, quantity, price, storage_requirements) VALUES (?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setInt(1, product.productId);
+            stmt.setString(2, product.productName);
+            stmt.setString(3, product.productType);
+            stmt.setInt(4, product.quantity);
+            stmt.setDouble(5, product.price);
+            stmt.setString(6, product.storageRequirements);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void updateStock(int productId, int quantity) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            String query = "UPDATE Products SET quantity = ? WHERE product_id = ?";
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setInt(1, quantity);
+            stmt.setInt(2, productId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public List<Product> viewProducts() {
+        List<Product> products = new ArrayList<>();
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            String query = "SELECT * FROM Products";
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(query);
+
+            while (rs.next()) {
+                int productId = rs.getInt("product_id");
+                String productName = rs.getString("product_name");
+                String productType = rs.getString("product_type");
+                int quantity = rs.getInt("quantity");
+                double price = rs.getDouble("price");
+                String storageRequirements = rs.getString("storage_requirements");
+
+                Product product;
+                if (productType.equals("Perishable")) {
+                    product = new PerishableProduct(productId, productName, quantity, price, storageRequirements);
+                } else {
+                    product = new NonPerishableProduct(productId, productName, quantity, price);
+                }
+                products.add(product);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return products;
+    }
+
+    @Override
+    public List<Supplier> viewSuppliers() {
+        List<Supplier> suppliers = new ArrayList<>();
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            String query = "SELECT * FROM Suppliers";
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(query);
+
+            while (rs.next()) {
+                int supplierId = rs.getInt("supplier_id");
+                String supplierName = rs.getString("supplier_name");
+                String contactName = rs.getString("contact_name");
+                String contactNumber = rs.getString("contact_number");
+                String address = rs.getString("address");
+
+                suppliers.add(new Supplier(supplierId, supplierName, contactName, contactNumber, address));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return suppliers;
+    }
+
+    public void addSupplier(Supplier supplier) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            String query = "INSERT INTO Suppliers (supplier_id, supplier_name, contact_name, contact_number, address) VALUES (?, ?, ?, ?, ?)";
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setInt(1, supplier.getSupplierId());
+            stmt.setString(2, supplier.getSupplierName());
+            stmt.setString(3, supplier.getContactName());
+            stmt.setString(4, supplier.getContactNumber());
+            stmt.setString(5, supplier.getAddress());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+//INVENTORY MANAGEMENT
+
+package Warehouse;
+
+import java.util.List;
+
+public interface InventoryManagement {
+    void addProduct(Product product);
+    void updateStock(int productId, int quantity);
+    List<Product> viewProducts();
+    List<Supplier> viewSuppliers();
+}
+
+
+//PRODUCT
+package Warehouse;
+
+public abstract class Product {
+    int productId;
+    String productName;
+    int quantity;
+    double price;
+    String productType;
+    String storageRequirements;
+
+    public Product(int productId, String productName, int quantity, double price) {
+        this.productId = productId;
+        this.productName = productName;
+        this.quantity = quantity;
+        this.price = price;
+    }
+
+    public abstract void displayProductInfo();
+}
+
+
+//SUPPLIER
+
+package Warehouse;
+
+public class Supplier {
+    private int supplierId;
+    private String supplierName;
+    private String contactName;
+    private String contactNumber;
+    private String address;
+
+    public Supplier(int supplierId, String supplierName, String contactName, String contactNumber, String address) {
+        this.supplierId = supplierId;
+        this.supplierName = supplierName;
+        this.contactName = contactName;
+        this.contactNumber = contactNumber;
+        this.address = address;
+    }
+
+    public int getSupplierId() {
+        return supplierId;
+    }
+
+    public String getSupplierName() {
+        return supplierName;
+    }
+
+    public String getContactName() {
+        return contactName;
+    }
+
+    public String getContactNumber() {
+        return contactNumber;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+}
+
+
+//STOCK REQUESTS
+package Warehouse;
+
+public class StockRequest {
+    private int requestId;
+    private int productId;
+    private int supplierId;
+    private int requestedQuantity;
+    private String requestDate;
+    private String status;
+
+    // Constructor to initialize all fields
+    public StockRequest(int requestId, int productId, int supplierId, int requestedQuantity, String requestDate, String status) {
+        this.requestId = requestId;
+        this.productId = productId;
+        this.supplierId = supplierId;
+        this.requestedQuantity = requestedQuantity;
+        this.requestDate = requestDate;
+        this.status = status;
+    }
+
+    // Getters and setters for each field
+    public int getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(int requestId) {
+        this.requestId = requestId;
+    }
+
+    public int getProductId() {
+        return productId;
+    }
+
+    public void setProductId(int productId) {
+        this.productId = productId;
+    }
+
+    public int getSupplierId() {
+        return supplierId;
+    }
+
+    public void setSupplierId(int supplierId) {
+        this.supplierId = supplierId;
+    }
+
+    public int getRequestedQuantity() {
+        return requestedQuantity;
+    }
+
+    public void setRequestedQuantity(int requestedQuantity) {
+        this.requestedQuantity = requestedQuantity;
+    }
+
+    public String getRequestDate() {
+        return requestDate;
+    }
+
+    public void setRequestDate(String requestDate) {
+        this.requestDate = requestDate;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    // Optional: toString method for easy display
+    @Override
+    public String toString() {
+        return "StockRequest{" +
+                "requestId=" + requestId +
+                ", productId=" + productId +
+                ", supplierId=" + supplierId +
+                ", requestedQuantity=" + requestedQuantity +
+                ", requestDate='" + requestDate + '\'' +
+                ", status='" + status + '\'' +
+                '}';
+    }
+}
+// PERISHABLE
+package Warehouse;
+
+
+public class PerishableProduct extends Product {
+    public PerishableProduct(int productId, String productName, int quantity, double price, String storageRequirements) {
+        super(productId, productName, quantity, price);
+        this.productType = "Perishable";
+        this.storageRequirements = storageRequirements;
+    }
+
+    @Override
+    public void displayProductInfo() {
+        System.out.println("Product ID: " + productId);
+        System.out.println("Product Name: " + productName);
+        System.out.println("Product Type: " + productType);
+        System.out.println("Quantity: " + quantity);
+        System.out.println("Price: " + price);
+        System.out.println("Storage Requirements: " + storageRequirements);
+    }
+}
+//NON PERISHABLE
+package Warehouse;
+
+
+
+public class NonPerishableProduct extends Product {
+    public NonPerishableProduct(int productId, String productName, int quantity, double price) {
+        super(productId, productName, quantity, price);
+        this.productType = "NonPerishable";
+    }
+
+    @Override
+    public void displayProductInfo() {
+        System.out.println("Product ID: " + productId);
+        System.out.println("Product Name: " + productName);
+        System.out.println("Product Type: " + productType);
+        System.out.println("Quantity: " + quantity);
+        System.out.println("Price: " + price);
+    }
+}
+
