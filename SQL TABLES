@@ -8,4 +8,3 @@ create table products(product_id int PRIMARY KEY, product_name VARCHAR(100) not 
 
 create table ProductHistory (history_id int primary key, product_id int, change_type varchar(50), quantity_change int, change_date datetime,notes varchar(255), foreign key (product_id) references products(product_id));
 
-create table InventoryLogs(product_id int, action varchar(50), quantity int, action_date datetime,performed_by varchar(100), foreign key (product_id)references products(product_id));
